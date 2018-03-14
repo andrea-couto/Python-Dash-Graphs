@@ -1,0 +1,4 @@
+{
+  "test_establish_web_response.py::TestEstablish_web_response::test_establish_web_response": true,
+  "test_func.py::TestFunc::test_func": true
+}

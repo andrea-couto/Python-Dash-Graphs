@@ -71,7 +71,7 @@ def remove_values(unfiltered_list, value):
 
 
 def main():
-    # HN_database = firebase.FirebaseApplication('https://hackernewsgraphs.firebaseio.com/', None)
+    HN_database = firebase.FirebaseApplication('https://hackernewsgraphs.firebaseio.com/', None)
     response = establish_web_response('https://hn.algolia.com/api/v1/search_by_date?query=%22Ask%20HN%20:%20Who%20is%20hiring%3F%22&hitsPerPage=100&numericFilters=created_at_i>1454338862')
     json_hits = get_json_hits(response)
     titles, ids = extract_info(json_hits)
@@ -79,6 +79,8 @@ def main():
     # geolocator = Nominatim()
     this_yr_locations = []
     last_yr_locations = []
+
+    HN_database.delete('', '')
 
     states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA",
               "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -101,7 +103,6 @@ def main():
     for i in range(len(ids)):
         month_url = requests.get(get_url + str(ids[i])).json()
         month_title = titles[str(month_url['id'])]
-        print(month_title)
         get_coord = False
         this_year = 'March 2018'
         last_year = 'March 2017'
@@ -157,6 +158,30 @@ def main():
                     num_comments += 1
                     update_languages(cleaned_comment, languages, keys)
 
+        percent = ((i+1)/len(ids))*100
+        sys.stdout.write("\rUploading: %d%% complete" % percent)
+        sys.stdout.flush()
+
+        HN_database.post('/num_comments', {month_title: num_comments})
+
+        HN_database.post('/onsite', {month_title: onsite})
+        HN_database.post('/remote', {month_title: remote})
+
+        HN_database.post('/python', {month_title: languages['python']})
+        c = languages[' c '] + languages[' c, ']
+        HN_database.post('/c', {month_title: c})
+        java = languages[' java '] + languages[' java, '] + languages[' java. ']
+        HN_database.post('/java', {month_title: java})
+        HN_database.post('/cplusplus', {month_title: languages['c++']})
+        HN_database.post('/csharp', {month_title: languages['c#']})
+        r = languages[' r '] + languages[' r, ']
+        HN_database.post('/r', {month_title: r})
+        HN_database.post('/javascript', {month_title: languages['javascript']})
+        HN_database.post('/php', {month_title: languages['php']})
+        go = languages[' go '] + languages[' go, ']
+        HN_database.post('/go', {month_title: go})
+        HN_database.post('/swift', {month_title: languages['swift']})
+
     for state in states:
         states_1[state] = this_yr_locations.count(state)
         states_2[state] = last_yr_locations.count(state)
@@ -166,35 +191,6 @@ def main():
     for state in states:
         file.write(state + "," + str(states_1[state]) + "," + str(states_2[state]) + "\n")
     file.close()
-        #
-        # file = open("last_yr_locations.txt", "w")
-        # for location in last_yr_locations:
-        #     file.write(location+"\n")
-        # file.close()
-
-        # percent = ((i+1)/len(ids))*100
-        # sys.stdout.write("\rUploading: %d%% complete" % percent)
-        # sys.stdout.flush()
-
-        # HN_database.post('/num_comments', {month_title: num_comments})
-        #
-        # HN_database.post('/onsite', {month_title: onsite})
-        # HN_database.post('/remote', {month_title: remote})
-        #
-        # HN_database.post('/python', {month_title: languages['python']})
-        # c = languages[' c '] + languages[' c, ']
-        # HN_database.post('/c', {month_title: c})
-        # java = languages[' java '] + languages[' java, '] + languages[' java. ']
-        # HN_database.post('/java', {month_title: java})
-        # HN_database.post('/cplusplus', {month_title: languages['c++']})
-        # HN_database.post('/csharp', {month_title: languages['c#']})
-        # r = languages[' r '] + languages[' r, ']
-        # HN_database.post('/r', {month_title: r})
-        # HN_database.post('/javascript', {month_title: languages['javascript']})
-        # HN_database.post('/php', {month_title: languages['php']})
-        # go = languages[' go '] + languages[' go, ']
-        # HN_database.post('/go', {month_title: go})
-        # HN_database.post('/swift', {month_title: languages['swift']})
 
 
 if __name__ == '__main__':

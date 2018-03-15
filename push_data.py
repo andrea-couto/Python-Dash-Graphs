@@ -1,6 +1,7 @@
-# THIS FILE PUSHES FILTERED DATA FROM HACKER NEWS TO FIREBASE DATABASE
-# if you would like to see how this works delete items in database first
-# TODO create remove_data() function for firebase before posting new data
+'''
+THIS FILE PUSHES FILTERED DATA FROM HACKER NEWS TO FIREBASE DATABASE
+AUTHOR: ANDY COUTO
+'''
 
 import requests
 from html.parser import HTMLParser
@@ -49,7 +50,7 @@ def get_json_hits(web_response):
 
 def extract_info(json_hits):
     title_id = {}
-    list_of_valid_hits = []  # Where i will store the valid objectIds
+    list_of_valid_hits = []  # store the valid objectIds
     for hits in json_hits:
         if hits['title'] is not None and hits['points'] > 100:
             title = hits['title']

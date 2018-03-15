@@ -1,3 +1,8 @@
+'''
+This file creates the webpage, connecting the data with Dash graphs
+AUTHOR: ANDY COUTO
+'''
+
 import dash
 import dash_core_components as dcc
 import dash_html_components as html

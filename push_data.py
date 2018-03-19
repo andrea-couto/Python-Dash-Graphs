@@ -1,5 +1,7 @@
 '''
 THIS FILE PUSHES FILTERED DATA FROM HACKER NEWS TO FIREBASE DATABASE
+CREATES TWO FILES LOCATION_1.CSV & LOCATION_2.CSV
+THESE FILES CONTAIN LOCATION DATA EXTRACTED FROM HACKER NEWS WHO IS HIRING FORUMS
 AUTHOR: ANDY COUTO
 '''
 
@@ -7,8 +9,8 @@ import requests
 from html.parser import HTMLParser
 import sys
 from firebase import firebase
-from geograpy import extraction
 from geopy.geocoders import Nominatim
+from geotext import GeoText
 
 
 class MLStripper(HTMLParser):
@@ -71,35 +73,51 @@ def remove_values(unfiltered_list, value):
         unfiltered_list.remove(value)
 
 
+def get_locations_for_year(found_entities):
+    locations = {}
+    for comment_cities in found_entities:
+        if len(comment_cities) > 0:
+            possible_city = comment_cities[0].capitalize()
+            if possible_city not in locations:
+                locations[possible_city] = 1
+            else:
+                locations[possible_city] += 1
+    return locations
+
+
+def get_coordinates_for_locations(locations, geolocator):
+    location_caching = {}
+    for possible_city in locations.keys():
+        resulting_geocode = geolocator.geocode(possible_city)  # if problem can add timeout=None
+        if resulting_geocode is not None:
+            point = (resulting_geocode.latitude, resulting_geocode.longitude)
+            location_caching[possible_city] = point
+    return location_caching
+
+
+#TODO ENFORCE UTF-8 ENCODING
+def write_loc_data_to_file(title, location_caching, locations):
+    file = open(title, "w")
+    file.write("city,latitude,longitude,occurrences\n")
+    for key in location_caching.keys():
+        coordinates = location_caching[key]
+        lat = str(coordinates[0])
+        long = str(coordinates[1])
+        file.write(key + "," + lat + "," + long + "," + str(locations[key])+"\n")
+    file.close()
+
+
 def main():
     HN_database = firebase.FirebaseApplication('https://hackernewsgraphs.firebaseio.com/', None)
     response = establish_web_response('https://hn.algolia.com/api/v1/search_by_date?query=%22Ask%20HN%20:%20Who%20is%20hiring%3F%22&hitsPerPage=100&numericFilters=created_at_i>1454338862')
     json_hits = get_json_hits(response)
     titles, ids = extract_info(json_hits)
     get_url = 'http://hn.algolia.com/api/v1/items/'
-    # geolocator = Nominatim()
+    geolocator = Nominatim()
     this_yr_locations = []
     last_yr_locations = []
 
     HN_database.delete('', '')
-
-    states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA",
-              "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-              "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-              "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-              "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
-
-    states_1 = {"AL": 0, "AK": 0, "AZ": 0, "AR": 0, "CA": 0, "CO": 0, "CT": 0, "DC": 0, "DE": 0, "FL": 0, "GA": 0,
-              "HI": 0, "ID": 0, "IL": 0, "IN": 0, "IA": 0, "KS": 0, "KY": 0, "LA": 0, "ME": 0, "MD": 0,
-              "MA": 0, "MI": 0, "MN": 0, "MS": 0, "MO": 0, "MT": 0, "NE": 0, "NV": 0, "NH": 0, "NJ": 0,
-              "NM": 0, "NY": 0, "NC": 0, "ND": 0, "OH": 0, "OK": 0, "OR": 0, "PA": 0, "RI": 0, "SC": 0,
-              "SD": 0, "TN": 0, "TX": 0, "UT": 0, "VT": 0, "VA": 0, "WA": 0, "WV": 0, "WI": 0, "WY": 0}
-
-    states_2 = {"AL": 0, "AK": 0, "AZ": 0, "AR": 0, "CA": 0, "CO": 0, "CT": 0, "DC": 0, "DE": 0, "FL": 0, "GA": 0,
-              "HI": 0, "ID": 0, "IL": 0, "IN": 0, "IA": 0, "KS": 0, "KY": 0, "LA": 0, "ME": 0, "MD": 0,
-              "MA": 0, "MI": 0, "MN": 0, "MS": 0, "MO": 0, "MT": 0, "NE": 0, "NV": 0, "NH": 0, "NJ": 0,
-              "NM": 0, "NY": 0, "NC": 0, "ND": 0, "OH": 0, "OK": 0, "OR": 0, "PA": 0, "RI": 0, "SC": 0,
-              "SD": 0, "TN": 0, "TX": 0, "UT": 0, "VT": 0, "VA": 0, "WA": 0, "WV": 0, "WI": 0, "WY": 0}
 
     for i in range(len(ids)):
         month_url = requests.get(get_url + str(ids[i])).json()
@@ -131,26 +149,20 @@ def main():
         num_comments = 0
         onsite = 0
         remote = 0
+
+        data_to_remove = ['Mongo', 'Most', 'Spring', 'Lutz', 'VAN', 'Of', 'Fleet', 'Opportunity']
         for comment in children:
             if comment is not None and comment['parent_id'] == month_url['id']:
                 if comment['text'] is not None:
                     if get_coord:
-                        e = extraction.Extractor(comment['text'])
-                        e.find_entities()
-                        entities = e.places[:5]  # if location not in first few entities drop it
-                        place_found = False
-                        for entity in entities:
-                            if not place_found:
-                                for state in states:
-                                    if state in entity:
-                                        # location = geolocator.geocode(state)
-                                        # if location is not None:
-                                            # point = (location.latitude, location.longitude)
-                                            if month_title == this_year:
-                                                this_yr_locations.append(state)
-                                            elif month_title == last_year:
-                                                last_yr_locations.append(state)
-                                            place_found = True
+                        places = GeoText(comment['text'])
+                        cities = places.cities
+                        for data in data_to_remove:
+                            remove_values(cities, data)
+                        if month_title == this_year:
+                            this_yr_locations.append(cities)
+                        elif month_title == last_year:
+                            last_yr_locations.append(cities)
                     cleaned_comment = strip_tags(comment['text'].lower())
                     if 'onsite' or 'on-site' in cleaned_comment:
                         onsite += 1
@@ -183,15 +195,13 @@ def main():
         HN_database.post('/go', {month_title: go})
         HN_database.post('/swift', {month_title: languages['swift']})
 
-    for state in states:
-        states_1[state] = this_yr_locations.count(state)
-        states_2[state] = last_yr_locations.count(state)
+    locations = get_locations_for_year(this_yr_locations)
+    location_caching = get_coordinates_for_locations(locations, geolocator)
+    write_loc_data_to_file("location_1.csv", location_caching, locations)
 
-    file = open("location_data.csv", "w")
-    file.write("state,year1,year2\n")
-    for state in states:
-        file.write(state + "," + str(states_1[state]) + "," + str(states_2[state]) + "\n")
-    file.close()
+    locations = get_locations_for_year(last_yr_locations)
+    location_caching = get_coordinates_for_locations(locations, geolocator)
+    write_loc_data_to_file("location_2.csv", location_caching, locations)
 
 
 if __name__ == '__main__':

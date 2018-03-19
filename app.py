@@ -13,6 +13,7 @@ import requests
 import sys
 import plotly.plotly as py
 
+
 database_url = 'https://hackernewsgraphs.firebaseio.com/'
 
 
@@ -92,13 +93,9 @@ def get_data_for_graphs(database):
 
 def main():
     app = dash.Dash()
-
     database = get_database(database_url)
-
     df, data, langdata = get_data_for_graphs(database)
-
     app.config.suppress_callback_exceptions = True
-
     app.layout = html.Div([
         dcc.Location(id='url', refresh=False),
         html.Div(id='page-content')
@@ -132,7 +129,7 @@ def main():
         '''),
 
         dcc.Graph(
-            id='example-graph',
+            id='number_comments',
             figure={
                 'data': [
                     go.Bar(
@@ -171,7 +168,7 @@ def main():
         '''),
 
         dcc.Graph(
-            id='example-graph',
+            id='onsite_remote',
             figure={
                 'data': data,
                 'layout': {
@@ -198,7 +195,7 @@ def main():
         '''),
 
         dcc.Graph(
-            id='example-graph',
+            id='prog_languages',
             figure={
                 'data': langdata,
                 'layout': {
@@ -217,15 +214,12 @@ def main():
         dcc.Link('Go back to home', href='/')
     ])
 
-    df1 = pd.read_csv('location_data.csv')
+    df1 = pd.read_csv('location_1.csv')
+    df2 = pd.read_csv('location_2.csv')
 
-    for col in df1.columns:
-        df1[col] = df1[col].astype(str)
-
-    scl = [[0.0, 'rgb(242,240,247)'], [0.2, 'rgb(218,218,235)'], [0.4, 'rgb(188,189,220)'],
-           [0.6, 'rgb(158,154,200)'], [0.8, 'rgb(117,107,177)'], [1.0, 'rgb(84,39,143)']]
-
-    df1['text'] = df1['state'] + '<br>' + 'Last Year: ' + df1['year2']
+    scl = [0, "rgb(150,0,90)"], [0.125, "rgb(0, 0, 200)"], [0.25, "rgb(0, 25, 255)"], \
+          [0.375, "rgb(0, 152, 255)"], [0.5, "rgb(44, 255, 150)"], [0.625, "rgb(151, 255, 0)"], \
+          [0.75, "rgb(255, 234, 0)"], [0.875, "rgb(255, 111, 0)"], [1, "rgb(255, 0, 0)"]
 
     page_4_layout = html.Div(children=[
         html.H1(children='Hacker News Who is Hiring Project'),
@@ -234,35 +228,102 @@ def main():
             By Andy Couto
         '''),
 
-        dcc.Graph(
-            id='example-graph',
+        html.Div(
+            dcc.Graph(
+            id='2018',
             figure={
                 'data': [ dict(
-                    type='choropleth',
-                    colorscale = scl,
-                    autocolorscale = False,
-                    locations = df1['state'],
-                    z=df1['year1'].astype(float),
-                    locationmode = 'USA-states',
-                    text = df1['text'],
-                    marker = dict(
-                        line = dict (
-                            color = 'rgb(255,255,255)',
-                            width = 2
-                        ) ),
-                    colorbar = dict(
-                        title = "This Year Jobs Reported")
-                    )],
+                    lat=df1['latitude'],
+                    lon=df1['longitude'],
+                    text=df1['city']+" "+df1['occurrences'].astype(str),
+                    marker=dict(
+                        color=df1['occurrences'],
+                        colorscale=scl,
+                        reversescale=True,
+                        opacity=0.7,
+                        size=8+(df1['occurrences']/2),
+                        ),
+                    type='scattergeo'
+                    )
+                ],
                 'layout': dict(
-                    title = 'Hacker News March Jobs Reported by State<br>(Hover for breakdown)',
-                    geo = dict(
-                        scope='usa',
-                        projection=dict( type='albers usa' ),
-                        showlakes = True,
-                        lakecolor = 'rgb(255, 255, 255)'),
-                         ),
+                    geo=dict(
+                        scope='world',
+                        showland=True,
+                        landcolor="rgb(212, 212, 212)",
+                        subunitcolor="rgb(255, 255, 255)",
+                        countrycolor="rgb(255, 255, 255)",
+                        showlakes=True,
+                        lakecolor="rgb(255, 255, 255)",
+                        showsubunits=True,
+                        showcountries=True,
+                        resolution=50,
+                        lonaxis=dict(
+                            showgrid=True,
+                            gridwidth=0.5,
+                            range=[-140.0, -55.0],
+                            dtick=5
+                        ),
+                        lataxis=dict(
+                            showgrid=True,
+                            gridwidth=0.5,
+                            range=[20.0, 60.0],
+                            dtick=5
+                        )
+                    ),
+                    title='Hacker News Location Data from March 2018',
+                ),
             }
-        ),
+        )),
+
+        html.Div(
+            dcc.Graph(
+            id = '2017',
+            figure = {
+                'data': [dict(
+                    lat=df2['latitude'],
+                    lon=df2['longitude'],
+                    text=df2['city'] + " " + df2['occurrences'].astype(str),
+                    marker=dict(
+                        color=df2['occurrences'],
+                        colorscale=scl,
+                        reversescale=True,
+                        opacity=0.7,
+                        size=8 + (df2['occurrences'] / 2),
+                    ),
+                    type='scattergeo'
+                )
+                ],
+                'layout': dict(
+                    geo=dict(
+                        scope='world',
+                        showland=True,
+                        landcolor="rgb(212, 212, 212)",
+                        subunitcolor="rgb(255, 255, 255)",
+                        countrycolor="rgb(255, 255, 255)",
+                        showlakes=True,
+                        lakecolor="rgb(255, 255, 255)",
+                        showsubunits=True,
+                        showcountries=True,
+                        resolution=50,
+                        lonaxis=dict(
+                            showgrid=True,
+                            gridwidth=0.5,
+                            range=[-140.0, -55.0],
+                            dtick=5
+                        ),
+                        lataxis=dict(
+                            showgrid=True,
+                            gridwidth=0.5,
+                            range=[20.0, 60.0],
+                            dtick=5
+                        )
+                    ),
+                    title='Hacker News Location Data from March 2017',
+                ),
+            }
+        )),
+
         html.Div(id='page-4-content'),
         html.Br(),
         dcc.Link('Go to Graph 1', href='/page-1'),

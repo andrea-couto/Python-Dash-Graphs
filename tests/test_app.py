@@ -9,3 +9,4 @@ def test_get_database():
 def test_invalid_get_database():
     with pytest.raises(SystemExit):
         app.get_database('https://hackernewsgraphs123.firebaseio.com/')
+

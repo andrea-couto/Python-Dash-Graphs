@@ -11,6 +11,7 @@ import sys
 from firebase import firebase
 from geopy.geocoders import Nominatim
 from geotext import GeoText
+import datetime
 
 
 class MLStripper(HTMLParser):
@@ -72,6 +73,11 @@ def remove_values(unfiltered_list, value):
     while value in unfiltered_list:
         unfiltered_list.remove(value)
 
+def print_uploading(i, ids):
+    percent = ((i + 1) / len(ids)) * 100
+    sys.stdout.write("\rUploading to firebase: %d%% complete" % percent)
+    sys.stdout.flush()
+
 
 def get_locations_for_year(found_entities):
     locations = {}
@@ -85,25 +91,59 @@ def get_locations_for_year(found_entities):
     return locations
 
 
-def get_coordinates_for_locations(locations, geolocator):
-    location_caching = {}
-    for possible_city in locations.keys():
-        resulting_geocode = geolocator.geocode(possible_city)  # if problem can add timeout=None
-        if resulting_geocode is not None:
-            point = (resulting_geocode.latitude, resulting_geocode.longitude)
-            location_caching[possible_city] = point
-    return location_caching
+def reset_values():
+    languages = {
+        'python': 0,
+        ' c ': 0,
+        ' c, ': 0,
+        ' java ': 0,
+        ' java, ': 0,
+        ' java. ': 0,
+        'c++': 0,
+        'c#': 0,
+        ' r ': 0,
+        ' r, ': 0,
+        'javascript': 0,
+        'php': 0,
+        ' go ': 0,
+        ' go, ': 0,
+        'swift': 0
+    }
+    keys = languages.keys()
+    num_comments = 0
+    onsite = 0
+    remote = 0
+    return languages, keys, num_comments, onsite, remote
 
 
 #TODO ENFORCE UTF-8 ENCODING
-def write_loc_data_to_file(title, location_caching, locations):
-    file = open(title, "w")
-    file.write("city,latitude,longitude,occurrences\n")
-    for key in location_caching.keys():
-        coordinates = location_caching[key]
-        lat = str(coordinates[0])
-        long = str(coordinates[1])
-        file.write(key + "," + lat + "," + long + "," + str(locations[key])+"\n")
+def write_difference_file(locations_1, locations_2, geolocator):
+    file = open("difference_in_jobs.csv", "w")
+    file.write("city,latitude,longitude,original,difference\n")
+    for key in locations_1.keys():
+        if key in locations_2.keys():
+            valid_geocode = True
+            lat, long = "", ""
+            difference = locations_1[key] - locations_2[key]
+            difference_percent = round((difference/locations_1[key])*100, 2)
+            if key == 'San francisco':
+                lat = "37.7749"
+                long = "-122.4194"
+            else:
+                resulting_geocode = geolocator.geocode(key)  # if problem can add timeout=None
+                if resulting_geocode is not None:
+                    lat = str(resulting_geocode.latitude)
+                    long = str(resulting_geocode.longitude)
+                else:
+                    valid_geocode = False
+            if valid_geocode:
+                file.write(key + "," + lat + "," + long + "," + str(locations_1[key]) + "," + str(difference_percent) + "\n")
+        else:
+            resulting_geocode = geolocator.geocode(key)  # if problem can add timeout=None
+            if resulting_geocode is not None:
+                lat = str(resulting_geocode.latitude)
+                long = str(resulting_geocode.longitude)
+                file.write(key + "," + lat + "," + long + "," + str(locations_1[key]) + "," + "100" + "\n")
     file.close()
 
 
@@ -114,8 +154,13 @@ def main():
     titles, ids = extract_info(json_hits)
     get_url = 'http://hn.algolia.com/api/v1/items/'
     geolocator = Nominatim()
-    this_yr_locations = []
-    last_yr_locations = []
+    userTime = datetime.datetime.now()
+    userMonth = userTime.strftime("%B")
+    userYear = userTime.year
+    this_year = (userMonth + " " + str(userYear))
+    last_year = (userMonth + " " + str(userYear-1))
+    this_yr_locations, last_yr_locations = [], []
+    data_to_remove = ['Mongo', 'Most', 'Spring', 'Lutz', 'VAN', 'Of', 'Fleet', 'Opportunity']
 
     HN_database.delete('', '')
 
@@ -123,34 +168,11 @@ def main():
         month_url = requests.get(get_url + str(ids[i])).json()
         month_title = titles[str(month_url['id'])]
         get_coord = False
-        this_year = 'March 2018'
-        last_year = 'March 2017'
         if month_title == this_year or month_title == last_year:
             get_coord = True
         children = month_url['children']
-        languages = {
-            'python': 0,
-            ' c ': 0,
-            ' c, ': 0,
-            ' java ': 0,
-            ' java, ': 0,
-            ' java. ': 0,
-            'c++': 0,
-            'c#': 0,
-            ' r ': 0,
-            ' r, ': 0,
-            'javascript': 0,
-            'php': 0,
-            ' go ': 0,
-            ' go, ': 0,
-            'swift': 0
-        }
-        keys = languages.keys()
-        num_comments = 0
-        onsite = 0
-        remote = 0
+        languages, keys, num_comments, onsite, remote = reset_values()
 
-        data_to_remove = ['Mongo', 'Most', 'Spring', 'Lutz', 'VAN', 'Of', 'Fleet', 'Opportunity']
         for comment in children:
             if comment is not None and comment['parent_id'] == month_url['id']:
                 if comment['text'] is not None:
@@ -171,9 +193,7 @@ def main():
                     num_comments += 1
                     update_languages(cleaned_comment, languages, keys)
 
-        percent = ((i+1)/len(ids))*100
-        sys.stdout.write("\rUploading: %d%% complete" % percent)
-        sys.stdout.flush()
+        print_uploading(i, ids)
 
         HN_database.post('/num_comments', {month_title: num_comments})
 
@@ -195,13 +215,13 @@ def main():
         HN_database.post('/go', {month_title: go})
         HN_database.post('/swift', {month_title: languages['swift']})
 
-    locations = get_locations_for_year(this_yr_locations)
-    location_caching = get_coordinates_for_locations(locations, geolocator)
-    write_loc_data_to_file("location_1.csv", location_caching, locations)
+    sys.stdout.write("\rcreating job difference csv file...")
+    sys.stdout.flush()
 
-    locations = get_locations_for_year(last_yr_locations)
-    location_caching = get_coordinates_for_locations(locations, geolocator)
-    write_loc_data_to_file("location_2.csv", location_caching, locations)
+    locations_1 = get_locations_for_year(this_yr_locations)
+    locations_2 = get_locations_for_year(last_yr_locations)
+
+    write_difference_file(locations_1, locations_2, geolocator)
 
 
 if __name__ == '__main__':

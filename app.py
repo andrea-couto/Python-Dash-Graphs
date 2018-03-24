@@ -11,7 +11,6 @@ import plotly.graph_objs as go
 from firebase import firebase
 import requests
 import sys
-import plotly.plotly as py
 
 
 database_url = 'https://hackernewsgraphs.firebaseio.com/'
@@ -214,12 +213,18 @@ def main():
         dcc.Link('Go back to home', href='/')
     ])
 
-    df1 = pd.read_csv('location_1.csv')
-    df2 = pd.read_csv('location_2.csv')
+    df1 = pd.read_csv('difference_in_jobs.csv')
 
     scl = [0, "rgb(150,0,90)"], [0.125, "rgb(0, 0, 200)"], [0.25, "rgb(0, 25, 255)"], \
           [0.375, "rgb(0, 152, 255)"], [0.5, "rgb(44, 255, 150)"], [0.625, "rgb(151, 255, 0)"], \
           [0.75, "rgb(255, 234, 0)"], [0.875, "rgb(255, 111, 0)"], [1, "rgb(255, 0, 0)"]
+
+    diff_converted = []
+    this_yr_jobs = []
+    for diff in df1['difference']:
+        diff_converted.append(str(diff))
+    for jobs in df1['original']:
+        this_yr_jobs.append(str(jobs))
 
     page_4_layout = html.Div(children=[
         html.H1(children='Hacker News Who is Hiring Project'),
@@ -235,13 +240,14 @@ def main():
                 'data': [ dict(
                     lat=df1['latitude'],
                     lon=df1['longitude'],
-                    text=df1['city']+" "+df1['occurrences'].astype(str),
+                    text=df1['city']+" "+diff_converted+"% difference from last year"+
+                         '<br>'+this_yr_jobs+' job(s) this year',
                     marker=dict(
-                        color=df1['occurrences'],
+                        color=df1['difference'],
                         colorscale=scl,
                         reversescale=True,
                         opacity=0.7,
-                        size=8+(df1['occurrences']/2),
+                        size=8+(df1['original']/2),
                         ),
                     type='scattergeo'
                     )
@@ -271,55 +277,7 @@ def main():
                             dtick=5
                         )
                     ),
-                    title='Hacker News Location Data from March 2018',
-                ),
-            }
-        )),
-
-        html.Div(
-            dcc.Graph(
-            id = '2017',
-            figure = {
-                'data': [dict(
-                    lat=df2['latitude'],
-                    lon=df2['longitude'],
-                    text=df2['city'] + " " + df2['occurrences'].astype(str),
-                    marker=dict(
-                        color=df2['occurrences'],
-                        colorscale=scl,
-                        reversescale=True,
-                        opacity=0.7,
-                        size=8 + (df2['occurrences'] / 2),
-                    ),
-                    type='scattergeo'
-                )
-                ],
-                'layout': dict(
-                    geo=dict(
-                        scope='world',
-                        showland=True,
-                        landcolor="rgb(212, 212, 212)",
-                        subunitcolor="rgb(255, 255, 255)",
-                        countrycolor="rgb(255, 255, 255)",
-                        showlakes=True,
-                        lakecolor="rgb(255, 255, 255)",
-                        showsubunits=True,
-                        showcountries=True,
-                        resolution=50,
-                        lonaxis=dict(
-                            showgrid=True,
-                            gridwidth=0.5,
-                            range=[-140.0, -55.0],
-                            dtick=5
-                        ),
-                        lataxis=dict(
-                            showgrid=True,
-                            gridwidth=0.5,
-                            range=[20.0, 60.0],
-                            dtick=5
-                        )
-                    ),
-                    title='Hacker News Location Data from March 2017',
+                    title='Hacker News Location Data<br>Difference in jobs this month this year vs last year'
                 ),
             }
         )),
